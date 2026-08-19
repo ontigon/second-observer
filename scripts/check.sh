@@ -64,7 +64,7 @@ rg -q -- '--bin second-observer --bin second-observer-upload' "${release_workflo
 rg -q 'toolchain: 1.97.1' "${release_workflow}"
 rg -q 'runner: macos-15-intel' "${release_workflow}"
 rg -q 'SHA256SUMS' "${release_workflow}"
-rg -q 'UTF8Encoding]::new(\$false)' "${release_workflow}"
+rg -Fq 'UTF8Encoding]::new($false)' "${release_workflow}"
 rg -q 'CRLF checksum sidecars are forbidden' "${release_workflow}"
 rg -q 'CRLF checksum manifest is forbidden' "${release_workflow}"
 rg -q 'sha256sum --strict -c SHA256SUMS' "${release_workflow}"
