@@ -1,0 +1,27 @@
+[package]
+name = "second-observer-upload"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "second-observer-upload"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+observer-domain = { path = "../observer-domain" }
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+chrono.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

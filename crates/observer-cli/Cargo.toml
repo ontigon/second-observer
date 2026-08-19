@@ -1,0 +1,24 @@
+[package]
+name = "second-observer"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "second-observer"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap.workspace = true
+observer-core = { path = "../observer-core" }
+observer-adapters = { path = "../observer-adapters" }
+observer-domain = { path = "../observer-domain" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-24.04
+          - windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace --locked
+      - name: Build
+        run: cargo build --workspace --locked
+
+  contracts:
+    name: contracts and dependency boundary
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - name: Validate JSON contracts
+        run: |
+          for contract_file in schemas/*.json registry/*.json; do
+            jq empty "$contract_file"
+          done
+      - name: Reject collector networking dependencies
+        shell: bash
+        run: |
+          collector_tree=$(cargo tree --locked -p second-observer --edges normal --prefix none)
+          if grep -E '^(reqwest|hyper|ureq|curl|native-tls|rustls)( |$)' <<<"$collector_tree"; then
+            echo 'collector dependency graph contains a network dependency' >&2
+            exit 1
+          fi

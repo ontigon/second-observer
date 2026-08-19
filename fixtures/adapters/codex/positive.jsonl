@@ -1,0 +1,6 @@
+{"timestamp":"2026-08-12T15:00:00Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"sanitized fixture"}]}}
+{"timestamp":"2026-08-12T15:00:30Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec_command","status":"completed"}}
+{"timestamp":"2026-08-12T15:01:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":13},"last_token_usage":{"input_tokens":11,"cached_input_tokens":2,"output_tokens":2,"total_tokens":13}}}}
+{"timestamp":"2026-08-12T15:01:15Z","type":"event_msg","payload":{"type":"agent_message"}}
+{"timestamp":"2026-08-12T15:01:30Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":13},"last_token_usage":{"input_tokens":11,"cached_input_tokens":2,"output_tokens":2,"total_tokens":13}}}}
+{"timestamp":"2026-08-12T15:02:00Z","type":"event_msg","payload":{"type":"turn_aborted"}}

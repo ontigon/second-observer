@@ -1,0 +1,23 @@
+# Rust build products
+/target/
+
+# Local participant outputs and study credentials
+/exports/
+/receipts/
+/private/
+*.study-export
+*.study-export.*
+*.receipt
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/

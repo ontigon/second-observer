@@ -1,0 +1,176 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  package:
+    name: package (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-aarch64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            archive: tar.gz
+          - name: macos-x86_64
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            archive: tar.gz
+          - name: linux-aarch64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            archive: tar.gz
+          - name: linux-x86_64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            archive: tar.gz
+          - name: windows-x86_64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            archive: zip
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - name: Require an annotated release tag
+        shell: bash
+        run: |
+          release_tag="${RELEASE_TAG}"
+          [[ "${release_tag}" =~ ^v[0-9][0-9A-Za-z.+_-]*$ ]]
+          [[ "$(git cat-file -t "refs/tags/${release_tag}")" == "tag" ]]
+          git rev-parse "${release_tag}^{commit}" >/dev/null
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+          targets: ${{ matrix.target }}
+      - name: Build locked release binaries
+        run: cargo build --locked --release --target ${{ matrix.target }} --bin second-observer --bin second-observer-upload
+      - name: Package Unix archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          release_tag="${RELEASE_TAG}"
+          [[ "${release_tag}" =~ ^v[0-9][0-9A-Za-z.+_-]*$ ]]
+          archive="second-observer-${release_tag}-${{ matrix.target }}.tar.gz"
+          mkdir -p dist
+          tar -C "target/${{ matrix.target }}/release" -czf "dist/${archive}" second-observer second-observer-upload
+          (
+            cd dist
+            shasum -a 256 "${archive}" > "${archive}.sha256"
+          )
+      - name: Package Windows archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $releaseTag = $env:RELEASE_TAG
+          if ($releaseTag -notmatch '^v[0-9][0-9A-Za-z.+_-]*$') { throw "invalid release tag: $releaseTag" }
+          $archive = "second-observer-$releaseTag-${{ matrix.target }}.zip"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path target/${{ matrix.target }}/release/second-observer.exe,target/${{ matrix.target }}/release/second-observer-upload.exe -DestinationPath "dist/$archive"
+          (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLower() + "  $archive" | Set-Content -Encoding ascii "dist/$archive.sha256"
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: target/${{ matrix.target }}/release
+          format: cyclonedx-json
+          output-file: dist/second-observer-${{ matrix.target }}.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Record locked Cargo dependency metadata
+        shell: bash
+        run: cargo metadata --locked --format-version 1 > "dist/second-observer-${{ matrix.target }}.cargo-metadata.json"
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign archive digest
+        shell: bash
+        run: |
+          checksum_file=$(find dist -name '*.sha256' -print -quit)
+          archive=${checksum_file%.sha256}
+          cosign sign-blob --yes --bundle "${archive}.sigstore.json" "${archive}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-24.04
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release manifest
+        shell: bash
+        run: |
+          cd dist
+          cat *.sha256 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          release_tag="${RELEASE_TAG}"
+          [[ "$(git -C .. cat-file -t "refs/tags/${release_tag}")" == "tag" ]]
+          source_commit="$(git -C .. rev-parse "${release_tag}^{commit}")"
+          metadata_digest="$(sha256sum ./*.cargo-metadata.json | sha256sum | awk '{print $1}')"
+          {
+            printf '{"release_tag":"%s","source_commit":"%s","cargo_metadata_set_sha256":"%s","archives":[' "${release_tag}" "${source_commit}" "${metadata_digest}"
+            first=1
+            for archive in ./*.tar.gz ./*.zip; do
+              [[ -f "${archive}" ]] || continue
+              digest="$(sha256sum "${archive}" | awk '{print $1}')"
+              name="${archive#./}"
+              target="${name#second-observer-${release_tag}-}"
+              target="${target%.tar.gz}"
+              target="${target%.zip}"
+              [[ "${first}" == 1 ]] || printf ','
+              first=0
+              printf '{"name":"%s","target":"%s","sha256":"%s"}' "${name}" "${target}" "${digest}"
+            done
+            printf '],"sboms":['
+            first=1
+            for sbom in ./*.cdx.json; do
+              [[ -f "${sbom}" ]] || continue
+              digest="$(sha256sum "${sbom}" | awk '{print $1}')"
+              [[ "${first}" == 1 ]] || printf ','
+              first=0
+              printf '{"name":"%s","sha256":"%s"}' "${sbom#./}" "${digest}"
+            done
+            printf ']}\n'
+          } > RELEASE-MANIFEST.json
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign release manifest
+        shell: bash
+        run: cosign sign-blob --yes --bundle dist/RELEASE-MANIFEST.sigstore.json dist/RELEASE-MANIFEST.json
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --generate-notes
+          gh release upload "$RELEASE_TAG" dist/* --clobber

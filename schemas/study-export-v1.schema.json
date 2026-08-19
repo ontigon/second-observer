@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://second.ontigon.ai/schemas/second-observer.study-export/v1",
+  "title": "Second Observer study export v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "collector", "study", "consent", "windows", "coverage", "metrics", "comparability", "privacy", "integrity", "nonclaims"],
+  "properties": {
+    "contract_version": { "const": "second-observer.study-export/v1" },
+    "collector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "binary_sha256", "configuration_sha256", "metric_registry_version", "adapter_registry_version"],
+      "properties": {
+        "version": { "type": "string" },
+        "binary_sha256": { "$ref": "#/$defs/sha256" },
+        "configuration_sha256": { "$ref": "#/$defs/sha256" },
+        "metric_registry_version": { "const": "second-observer.metrics/v1" },
+        "adapter_registry_version": { "const": "second-observer.adapters/v1" }
+      }
+    },
+    "study": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["participant_id", "device_id", "run_id"],
+      "properties": {
+        "participant_id": { "$ref": "#/$defs/scopedId" },
+        "device_id": { "$ref": "#/$defs/scopedId" },
+        "run_id": { "$ref": "#/$defs/scopedId" }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_sha256", "approved_adapters", "approved_field_classes", "content_analysis", "collection_approved_at"],
+      "properties": {
+        "manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "approved_adapters": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "approved_field_classes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "content_analysis": { "type": "boolean" },
+        "collection_approved_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "windows": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/window" } },
+    "coverage": { "type": "array", "items": { "$ref": "#/$defs/coverage" } },
+    "metrics": { "type": "array", "items": { "$ref": "#/$defs/metric" } },
+    "comparability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "blocking_mismatches"],
+      "properties": {
+        "disposition": { "enum": ["COMPARABLE_DESCRIPTIVE", "PARTIAL", "INCOMPARABLE", "COLLECTION_FAILED"] },
+        "blocking_mismatches": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["forbidden_fields_absent", "content_persisted", "content_exported"],
+      "properties": {
+        "forbidden_fields_absent": { "const": true },
+        "content_persisted": { "const": false },
+        "content_exported": { "const": false }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload_sha256"],
+      "properties": { "payload_sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "nonclaims": { "type": "array", "minItems": 4, "items": { "type": "string" }, "uniqueItems": true }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "scopedId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{8,80}$" },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "start", "end", "timezone"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["retained_history", "baseline_28d", "post_28d"] },
+        "start": { "type": ["string", "null"], "format": "date-time" },
+        "end": { "type": "string", "format": "date-time" },
+        "timezone": { "type": "string" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter_id", "adapter_version", "status", "observed_records", "missingness_reasons"],
+      "properties": {
+        "adapter_id": { "type": "string" },
+        "adapter_version": { "type": "string" },
+        "status": { "enum": ["observed", "detected_unmeasured", "unsupported_version", "permission_denied", "missing", "disabled"] },
+        "observed_records": { "type": "integer", "minimum": 0 },
+        "missingness_reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric_id", "adapter_id", "window_id", "source_definition_version", "evidence_class", "unit", "value", "eligible_count", "observed_count", "missing_count"],
+      "properties": {
+        "metric_id": { "type": "string" },
+        "adapter_id": { "type": "string" },
+        "window_id": { "type": "string" },
+        "source_definition_version": { "type": "string", "minLength": 1 },
+        "evidence_class": { "enum": ["observed_counter", "deterministic_derived", "local_content_heuristic", "estimated", "unknown", "not_applicable"] },
+        "unit": { "type": "string" },
+        "value": { "type": ["number", "null"] },
+        "eligible_count": { "type": "integer", "minimum": 0 },
+        "observed_count": { "type": "integer", "minimum": 0 },
+        "missing_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

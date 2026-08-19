@@ -1,0 +1,19 @@
+[package]
+name = "observer-adapters"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ontigon/second-observer"
+
+[dependencies]
+chrono.workspace = true
+observer-core = { path = "../observer-core" }
+observer-domain = { path = "../observer-domain" }
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

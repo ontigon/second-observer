@@ -1,0 +1,24 @@
+{
+  "registry_version": "second-observer.metrics/v1",
+  "metrics": [
+    { "id": "active_days", "unit": "days", "evidence": "deterministic_derived", "comparable": true },
+    { "id": "retained_sessions", "unit": "sessions", "evidence": "observed_counter", "comparable": true },
+    { "id": "human_turns", "unit": "turns", "evidence": "observed_counter", "comparable": true },
+    { "id": "agent_turns", "unit": "turns", "evidence": "observed_counter", "comparable": true },
+    { "id": "tool_operations", "unit": "operations", "evidence": "observed_counter", "comparable": true },
+    { "id": "tool_error_signals", "unit": "signals", "evidence": "observed_counter", "comparable": true },
+    { "id": "interrupt_signals", "unit": "signals", "evidence": "observed_counter", "comparable": true },
+    { "id": "peak_overlapping_sessions", "unit": "sessions", "evidence": "deterministic_derived", "comparable": true },
+    { "id": "input_tokens", "unit": "tokens", "evidence": "observed_counter", "comparable": "same-adapter-only" },
+    { "id": "cached_input_tokens", "unit": "tokens", "evidence": "observed_counter", "comparable": "same-adapter-only" },
+    { "id": "cache_write_input_tokens", "unit": "tokens", "evidence": "observed_counter", "comparable": "same-adapter-only" },
+    { "id": "output_tokens", "unit": "tokens", "evidence": "observed_counter", "comparable": "same-adapter-only" },
+    { "id": "reasoning_output_tokens", "unit": "tokens", "evidence": "observed_counter", "comparable": "same-adapter-only" },
+    { "id": "total_tokens", "unit": "tokens", "evidence": "observed_counter", "comparable": "same-adapter-only" },
+    { "id": "manual_relay_ratio", "unit": "ratio", "evidence": "local_content_heuristic", "comparable": true },
+    { "id": "routing_message_ratio", "unit": "ratio", "evidence": "local_content_heuristic", "comparable": true },
+    { "id": "correction_signals", "unit": "signals", "evidence": "local_content_heuristic", "comparable": true },
+    { "id": "git_commits", "unit": "commits", "evidence": "observed_counter", "comparable": true },
+    { "id": "linked_worktrees", "unit": "worktrees", "evidence": "observed_counter", "comparable": true }
+  ]
+}

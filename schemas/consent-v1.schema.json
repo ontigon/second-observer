@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://second.ontigon.ai/schemas/second-observer.consent/v1",
+  "title": "Second Observer consent manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "created_at",
+    "expires_at",
+    "approved_adapters",
+    "approved_field_classes",
+    "prohibited_field_classes",
+    "content_analysis",
+    "windows"
+  ],
+  "properties": {
+    "contract_version": { "const": "second-observer.consent/v1" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "approved_adapters": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+    },
+    "approved_field_classes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["filesystem_metadata", "timestamps", "event_types", "counters", "message_text", "command_text"] }
+    },
+    "prohibited_field_classes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "content_analysis": { "type": "boolean", "default": false },
+    "windows": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "enum": ["retained_history", "baseline_28d", "post_28d"] },
+      "oneOf": [
+        {
+          "allOf": [
+            { "contains": { "const": "retained_history" } },
+            { "contains": { "const": "baseline_28d" } }
+          ]
+        },
+        {
+          "allOf": [
+            { "contains": { "const": "retained_history" } },
+            { "contains": { "const": "post_28d" } }
+          ]
+        }
+      ]
+    }
+  }
+}

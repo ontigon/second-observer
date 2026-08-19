@@ -1,0 +1,14 @@
+{
+  "registry_version": "second-observer.adapters/v1",
+  "adapters": [
+    { "id": "claude-code", "measurement": "retained-jsonl", "initial_status": "supported", "content_capable": true },
+    { "id": "codex", "measurement": "retained-jsonl", "initial_status": "supported", "content_capable": true },
+    { "id": "cursor", "measurement": "detection-only", "initial_status": "detection-only", "content_capable": false },
+    { "id": "git-worktrees", "measurement": "filesystem-metadata", "initial_status": "supported", "content_capable": false },
+    { "id": "shell-history", "measurement": "retained-text", "initial_status": "opt-in", "content_capable": true },
+    { "id": "second", "measurement": "native-events", "initial_status": "detection-only", "content_capable": false },
+    { "id": "zed", "measurement": "client-state", "initial_status": "detection-only", "content_capable": false },
+    { "id": "vscode-copilot", "measurement": "client-state", "initial_status": "detection-only", "content_capable": false },
+    { "id": "warp", "measurement": "client-state", "initial_status": "detection-only", "content_capable": false }
+  ]
+}
