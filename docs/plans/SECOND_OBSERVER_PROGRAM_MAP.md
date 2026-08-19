@@ -177,8 +177,8 @@ SO-05 + private intake validation -> SO-06
 | SO-02 | closed 2026-08-18 | allowlisted Claude/Codex/Git/shell adapters pass bounded fixtures; Cursor, Zed, VS Code/Copilot, Warp, and Second preserve explicit detection or missingness rather than fabricate measures |
 | SO-03 | closed 2026-08-18 | registry, consent, canonical-byte, tamper, content-coupling, forbidden-field, link, size, and JSON-safe-count gates pass; public/private fixture SHA-256 is `aedbe6642ee82102e63aec7373e5f324628f15b0c384fc7ff95c79b712aeee05` |
 | SO-04 | closed 2026-08-18 | isolated uploader and live Cloudflare negotiate/upload/finalize/queue/result/revoke flow passed; receipt `5b27d1b9-a11a-4404-81aa-9f77ee084abf` ended `revoked` with zero derived rows |
-| SO-05 | in progress 2026-08-18 | public source and release workflows pass locally; GitHub CI, signed cross-platform artifacts, and release verification remain open |
-| SO-06 | blocked 2026-08-18 | depends SO-03 through SO-05 and private intake validation |
+| SO-05 | closed 2026-08-19 | `v0.1.2` published 28 assets for five targets; aggregate checksums, six Sigstore identities, archive contents, signed-manifest bindings, non-empty SBOM graphs, and path-free dependency records passed independent download verification; defective `v0.1.0` remains immutable and marked withdrawn |
+| SO-06 | blocked 2026-08-19 | release and private-intake gates are closed; Aaron collection requires explicit preview/consent, and Doug has not returned a baseline receipt |
 
 ## Turn log
 
@@ -187,4 +187,5 @@ SO-05 + private intake validation -> SO-06
 ```text
 SO-00 | closed/director-integrated | Measurement, privacy, schema, adapter, and metric contracts frozen before collector implementation | docs/design/MEASUREMENT_CONTRACT.md
 SO-01..SO-04 | closed/director-integrated | Collector, adapters, privacy boundary, isolated uploader, and live private intake protocol passed their declared local and live gates | scripts/check.sh
+SO-05 | closed/director-integrated | v0.1.2 cross-platform release and independent public-asset verification passed; v0.1.0 preserved and withdrawn after checksum/SBOM red-team failures | https://github.com/ontigon/second-observer/releases/tag/v0.1.2
 ```

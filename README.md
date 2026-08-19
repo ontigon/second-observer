@@ -8,7 +8,7 @@ It produces aggregate study exports. It does not make productivity, correctness,
 
 [verified] This repository currently contains the public participant, privacy, security, and release surface.
 
-[assumed] Release artifacts will provide the `second-observer` collector and the isolated `second-observer-upload` uploader for macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64.
+[verified] Release `v0.1.2` provides the `second-observer` collector and isolated `second-observer-upload` uploader for macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64. Published checksums, Sigstore identities, archive contents, SBOM graphs, sanitized dependency records, and signed manifest bindings pass independent download verification.
 
 ## Participant workflow
 
