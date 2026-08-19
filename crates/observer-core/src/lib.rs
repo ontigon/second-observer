@@ -201,6 +201,14 @@ pub fn collect(
     )
 }
 
+/// Historical default measurement-window length, kept so existing callers are unchanged.
+pub const DEFAULT_WINDOW_DAYS: u16 = 28;
+
+/// Permitted measurement-window lengths. A window is a comparability unit, not a fixed constant:
+/// baseline and post must be equal in length, and `matching_phase_windows` enforces that from the
+/// recorded bounds rather than from any single blessed number.
+pub const WINDOW_DAYS_RANGE: std::ops::RangeInclusive<u16> = 1..=365;
+
 /// Builds an export from adapter-owned content-free observations.
 pub fn collect_measurements(
     consent: &ConsentManifest,
@@ -219,7 +227,8 @@ pub fn collect_measurements(
         binary_sha256,
         study,
         measurements,
-        WindowKind::Baseline28d,
+        WindowKind::Baseline,
+        DEFAULT_WINDOW_DAYS,
     )
 }
 
@@ -234,6 +243,7 @@ pub fn collect_measurements_phase(
     study: Study,
     measurements: &[AdapterMeasurement],
     phase: WindowKind,
+    window_days: u16,
 ) -> Result<StudyExport, CoreError> {
     consent.validate(now)?;
     if timezone.trim().is_empty() {
@@ -249,22 +259,33 @@ pub fn collect_measurements_phase(
             return Err(CoreError::UnknownAdapter(adapter.clone()));
         }
     }
-    if !matches!(phase, WindowKind::Baseline28d | WindowKind::Post28d)
+    if !matches!(phase, WindowKind::Baseline | WindowKind::Post)
         || !consent.windows.contains(&phase)
     {
         return Err(CoreError::Domain(DomainError::InvalidContract(
             "collection phase is not approved by consent".to_owned(),
         )));
     }
-    let windows = collection_windows(now, timezone, phase)?;
+    let windows = collection_windows(now, timezone, phase, window_days)?;
     let coverage = measurements
         .iter()
         .filter(|measurement| consent.approved_adapters.contains(&measurement.coverage.adapter_id))
         .map(|measurement| measurement.coverage.clone())
         .collect();
     let metrics = reduce_measurements(measurements, &windows, timezone)?;
+    // Identify the phase window by kind and read its id back, so a variable window length cannot
+    // silently miss a literal.
+    let phase_window_id = windows
+        .iter()
+        .find(|window| window.kind == phase)
+        .map(|window| window.id.clone())
+        .ok_or_else(|| {
+            CoreError::Domain(DomainError::InvalidContract(
+                "collection produced no phase window".to_owned(),
+            ))
+        })?;
     let comparability = if metrics.iter().any(|metric| {
-        metric.window_id == "baseline-28d" && metric.value.is_some() && metric.missing_count == 0
+        metric.window_id == phase_window_id && metric.value.is_some() && metric.missing_count == 0
     }) {
         Comparability {
             disposition: ComparabilityDisposition::ComparableDescriptive,
@@ -562,16 +583,25 @@ fn collection_windows(
     now: DateTime<Utc>,
     timezone: &str,
     phase: WindowKind,
+    window_days: u16,
 ) -> Result<Vec<observer_domain::CollectionWindow>, CoreError> {
+    if !WINDOW_DAYS_RANGE.contains(&window_days) {
+        return Err(CoreError::Domain(DomainError::InvalidContract(format!(
+            "window length must be between {} and {} days",
+            WINDOW_DAYS_RANGE.start(),
+            WINDOW_DAYS_RANGE.end()
+        ))));
+    }
     let timezone: Tz = timezone.parse().map_err(|_| {
         CoreError::Domain(DomainError::InvalidContract(
             "timezone must be an IANA timezone name".to_owned(),
         ))
     })?;
     let local_today = now.with_timezone(&timezone).date_naive();
-    let baseline_start_day = local_today.checked_sub_days(Days::new(28)).ok_or_else(|| {
-        CoreError::Domain(DomainError::InvalidContract("baseline window underflow".to_owned()))
-    })?;
+    let baseline_start_day =
+        local_today.checked_sub_days(Days::new(u64::from(window_days))).ok_or_else(|| {
+            CoreError::Domain(DomainError::InvalidContract("baseline window underflow".to_owned()))
+        })?;
     let baseline_start = local_midnight(timezone, baseline_start_day)?;
     let baseline_end = local_midnight(timezone, local_today)?;
     Ok(vec![
@@ -584,11 +614,10 @@ fn collection_windows(
         },
         observer_domain::CollectionWindow {
             id: match phase {
-                WindowKind::Baseline28d => "baseline-28d",
-                WindowKind::Post28d => "post-28d",
+                WindowKind::Baseline => format!("baseline-{window_days}d"),
+                WindowKind::Post => format!("post-{window_days}d"),
                 WindowKind::RetainedHistory => unreachable!(),
-            }
-            .to_owned(),
+            },
             kind: phase,
             start: Some(baseline_start),
             end: baseline_end,
@@ -686,9 +715,8 @@ pub fn compare(baseline: &StudyExport, post: &StudyExport) -> Comparability {
     {
         gates.push("study_identity_changed".to_owned());
     }
-    let before_window =
-        baseline.windows.iter().find(|window| window.kind == WindowKind::Baseline28d);
-    let after_window = post.windows.iter().find(|window| window.kind == WindowKind::Post28d);
+    let before_window = baseline.windows.iter().find(|window| window.kind == WindowKind::Baseline);
+    let after_window = post.windows.iter().find(|window| window.kind == WindowKind::Post);
     if !matching_phase_windows(before_window, after_window) {
         gates.push("phase_window_mismatch".to_owned());
     }

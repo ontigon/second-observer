@@ -19,10 +19,12 @@ Every collection produces two independent profiles:
 
 1. `retained_history`: all records still available to each approved adapter, with earliest and latest
    observed timestamps and explicit coverage limits.
-2. `baseline_28d`: the 28 complete local calendar days ending before collection day.
+2. `baseline`: the N complete local calendar days ending before collection day, where N is the
+   declared window length (`--baseline N`, default 28). Baseline and post must declare the same N.
 
-Retained history never enters a matched-window comparison. A later Second-use collection compares its
-28-day profile only with a compatible 28-day baseline.
+Retained history never enters a matched-window comparison. A post collection compares only with a
+baseline of equal window length. `compare` derives both lengths from the recorded window bounds and
+returns `phase_window_mismatch` when they differ, so an unequal pair is refused rather than compared.
 
 ## Evidence classes
 

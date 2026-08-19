@@ -422,7 +422,7 @@ mod tests {
                 },
                 observer_domain::CollectionWindow {
                     id: "baseline-28d".to_owned(),
-                    kind: observer_domain::WindowKind::Baseline28d,
+                    kind: observer_domain::WindowKind::Baseline,
                     start: Some(at - chrono::Duration::days(28)),
                     end: at,
                     timezone: "UTC".to_owned(),

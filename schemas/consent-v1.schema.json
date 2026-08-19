@@ -40,18 +40,18 @@
       "minItems": 2,
       "maxItems": 2,
       "uniqueItems": true,
-      "items": { "enum": ["retained_history", "baseline_28d", "post_28d"] },
+      "items": { "enum": ["retained_history", "baseline", "post"] },
       "oneOf": [
         {
           "allOf": [
             { "contains": { "const": "retained_history" } },
-            { "contains": { "const": "baseline_28d" } }
+            { "contains": { "const": "baseline" } }
           ]
         },
         {
           "allOf": [
             { "contains": { "const": "retained_history" } },
-            { "contains": { "const": "post_28d" } }
+            { "contains": { "const": "post" } }
           ]
         }
       ]

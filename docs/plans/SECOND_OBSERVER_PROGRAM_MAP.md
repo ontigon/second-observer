@@ -17,7 +17,7 @@ scope: "Design, implement, validate, and prepare public release of the determini
 |---|---|---|
 | `G1` | The public measurement and privacy contract is frozen. | Versioned schemas define consent, coverage, evidence classes, metrics, missingness, comparability, forbidden fields, integrity, and nonclaims. |
 | `G2` | The local collector is deterministic and network-isolated. | Cross-platform fixtures pass; filesystem reads match the approved adapter plan; collector dependency and runtime checks find no network path. |
-| `G3` | Supported adapters produce safe retained-history and 28-day aggregates. | Claude Code, Codex, Cursor, Git/worktree, shell, and Second fixtures pass; Zed, VS Code/Copilot, and Warp report measured or explicit detected-unmeasured states. |
+| `G3` | Supported adapters produce safe retained-history and matched-window aggregates. | Claude Code, Codex, Cursor, Git/worktree, shell, and Second fixtures pass; Zed, VS Code/Copilot, and Warp report measured or explicit detected-unmeasured states. |
 | `G4` | Export and upload have an inspectable consent boundary. | Preview is byte-equivalent to the export payload; the uploader reads only a finalized export; digest, tamper, revocation, and receipt tests pass. |
 | `G5` | A public participant workflow is release-ready. | Signed release artifacts, SBOM, checksums, agent prompts, threat model, and an Aaron calibration receipt pass without participant data entering Git. |
 

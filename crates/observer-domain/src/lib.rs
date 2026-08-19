@@ -124,7 +124,7 @@ impl ConsentManifest {
                 "stable_machine_identifiers".to_owned(),
             ],
             content_analysis: false,
-            windows: vec![WindowKind::RetainedHistory, WindowKind::Baseline28d],
+            windows: vec![WindowKind::RetainedHistory, WindowKind::Baseline],
         }
     }
 
@@ -140,14 +140,14 @@ impl ConsentManifest {
         if self.expires_at <= self.created_at || self.expires_at <= now {
             return Err(DomainError::InvalidContract("consent manifest is expired".to_owned()));
         }
-        let phase_count = usize::from(self.windows.contains(&WindowKind::Baseline28d))
-            + usize::from(self.windows.contains(&WindowKind::Post28d));
+        let phase_count = usize::from(self.windows.contains(&WindowKind::Baseline))
+            + usize::from(self.windows.contains(&WindowKind::Post));
         if self.windows.len() != 2
             || !self.windows.contains(&WindowKind::RetainedHistory)
             || phase_count != 1
         {
             return Err(DomainError::InvalidContract(
-                "consent must approve retained_history and exactly one 28-day phase".to_owned(),
+                "consent must approve retained_history and exactly one measurement phase".to_owned(),
             ));
         }
         if self.approved_adapters.is_empty()
@@ -206,14 +206,12 @@ pub enum FieldClass {
     CommandText,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WindowKind {
     RetainedHistory,
-    #[serde(rename = "baseline_28d")]
-    Baseline28d,
-    #[serde(rename = "post_28d")]
-    Post28d,
+    Baseline,
+    Post,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -446,9 +444,9 @@ impl StudyExport {
         if self.windows.len() < 2
             || !self.windows.iter().any(|window| window.kind == WindowKind::RetainedHistory)
             || (usize::from(
-                self.windows.iter().any(|window| window.kind == WindowKind::Baseline28d),
+                self.windows.iter().any(|window| window.kind == WindowKind::Baseline),
             ) + usize::from(
-                self.windows.iter().any(|window| window.kind == WindowKind::Post28d),
+                self.windows.iter().any(|window| window.kind == WindowKind::Post),
             )) != 1
         {
             return Err(DomainError::InvalidContract(

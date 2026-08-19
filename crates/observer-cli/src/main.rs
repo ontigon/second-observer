@@ -81,7 +81,9 @@ struct DiscoverCommand {
 struct CollectCommand {
     #[arg(long, default_value = "retained-history")]
     profile: String,
-    #[arg(long, default_value_t = 28)]
+    /// Measurement-window length in days. Baseline and post must use the same value; a mismatch
+    /// makes the pair INCOMPARABLE rather than silently comparing unequal windows.
+    #[arg(long, default_value_t = observer_core::DEFAULT_WINDOW_DAYS)]
     baseline: u16,
     #[arg(long, default_value_os_t = default_consent_path())]
     consent: PathBuf,
@@ -112,8 +114,8 @@ enum Phase {
 impl Phase {
     const fn window(self) -> WindowKind {
         match self {
-            Self::Baseline => WindowKind::Baseline28d,
-            Self::Post => WindowKind::Post28d,
+            Self::Baseline => WindowKind::Baseline,
+            Self::Post => WindowKind::Post,
         }
     }
 }
@@ -210,8 +212,17 @@ fn discover_command(command: DiscoverCommand) -> anyhow::Result<()> {
 }
 
 fn collect_command(command: CollectCommand) -> anyhow::Result<()> {
-    if command.profile != "retained-history" || command.baseline != 28 {
-        anyhow::bail!("v1 requires --profile retained-history --baseline 28");
+    if command.profile != "retained-history" {
+        anyhow::bail!("v1 requires --profile retained-history");
+    }
+    // The window length is a comparability unit, not a constant. Baseline and post must be equal
+    // in length; `compare` enforces that from the recorded bounds and refuses when they differ.
+    if !observer_core::WINDOW_DAYS_RANGE.contains(&command.baseline) {
+        anyhow::bail!(
+            "--baseline must be between {} and {} days",
+            observer_core::WINDOW_DAYS_RANGE.start(),
+            observer_core::WINDOW_DAYS_RANGE.end()
+        );
     }
     let now = Utc::now();
     let consent = load_consent(&command.consent, now)
@@ -242,6 +253,7 @@ fn collect_command(command: CollectCommand) -> anyhow::Result<()> {
         load_or_create_study(&command.identity)?,
         &measurements,
         command.phase.window(),
+        command.baseline,
     )?;
     write_pending(&command.output, &export)?;
     println!("{}\t{}", export.integrity.payload_sha256, command.output.display());

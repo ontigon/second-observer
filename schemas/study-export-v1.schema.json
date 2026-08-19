@@ -80,7 +80,7 @@
       "required": ["id", "kind", "start", "end", "timezone"],
       "properties": {
         "id": { "type": "string" },
-        "kind": { "enum": ["retained_history", "baseline_28d", "post_28d"] },
+        "kind": { "enum": ["retained_history", "baseline", "post"] },
         "start": { "type": ["string", "null"], "format": "date-time" },
         "end": { "type": "string", "format": "date-time" },
         "timezone": { "type": "string" }

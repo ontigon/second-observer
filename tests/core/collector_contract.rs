@@ -93,7 +93,7 @@ fn comparison_returns_every_contract_disposition() {
     }
     let phase = post.windows.iter_mut().find(|window| window.id == "baseline-28d").expect("phase window");
     phase.id = "post-28d".to_owned();
-    phase.kind = observer_domain::WindowKind::Post28d;
+    phase.kind = observer_domain::WindowKind::Post;
 
     baseline.metrics.push(observed_metric("human_turns"));
     post.metrics.push(observed_metric("human_turns"));

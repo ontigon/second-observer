@@ -17,7 +17,7 @@ Use a signed release binary. Rust is not required.
 ```text
 second-observer discover --home <participant-home>
 second-observer consent init --phase baseline
-second-observer collect --profile retained-history --baseline 28 --phase baseline --home <participant-home> --timezone <iana-timezone>
+second-observer collect --profile retained-history --baseline <days> --phase baseline --home <participant-home> --timezone <iana-timezone>
 second-observer preview
 second-observer export
 second-observer verify <export>
@@ -30,7 +30,8 @@ Use `consent init --content-analysis` only for locally aggregated relay, routing
 
 Run a later matched window with a new consent manifest and `--phase post`, then use
 `second-observer compare <baseline-export> <post-export>`. A consent manifest authorizes exactly one
-28-day phase.
+phase. `--baseline <days>` sets the window length (1-365, default 28); baseline and post must use the
+same value and the same approved adapters, or the pair is refused as `INCOMPARABLE`.
 
 Read [the participant workflow](docs/participant/WORKFLOW.md), [privacy contract](PRIVACY.md), and [security policy](SECURITY.md) before collecting.
 
