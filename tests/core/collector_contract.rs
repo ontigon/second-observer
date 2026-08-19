@@ -1,6 +1,6 @@
 use chrono::{Duration, TimeZone, Utc};
 use observer_core::{
-    atomic_write_owner_only, collect, compare, random_study, Adapter, RegistryPlaceholderAdapter,
+    collect, compare, random_study, Adapter, RegistryPlaceholderAdapter,
 };
 use observer_domain::{
     ComparabilityDisposition, ConsentManifest, CoverageStatus, EvidenceClass, MetricValue,
@@ -113,6 +113,6 @@ fn atomic_output_is_owner_only() {
 
     let directory = tempfile::tempdir().expect("tempdir");
     let output = directory.path().join("export.study-export");
-    atomic_write_owner_only(&output, b"{}").expect("write");
+    observer_core::atomic_write_owner_only(&output, b"{}").expect("write");
     assert_eq!(std::fs::metadata(output).expect("metadata").permissions().mode() & 0o077, 0);
 }
