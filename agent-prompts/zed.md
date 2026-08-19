@@ -3,7 +3,7 @@
 ```text
 Use only the released Second Observer binaries and run this deterministic workflow exactly:
 
-0. Download the correct `v0.1.0` archive for this machine from `https://github.com/ontigon/second-observer/releases/tag/v0.1.0`. Verify its SHA-256 entry and Sigstore bundle using the repository release instructions, then extract it. Do not build from source.
+0. Download the correct `v0.1.1` archive for this machine from `https://github.com/ontigon/second-observer/releases/tag/v0.1.1`. Verify its SHA-256 entry and Sigstore bundle using the repository release instructions, then extract it. Do not build from source.
 1. Ask me for the collection phase (`baseline` or `post`), explicit participant home directory, and IANA timezone. Do not infer any of them.
 2. second-observer discover --home <participant-home>
 3. second-observer consent init --phase <baseline|post>

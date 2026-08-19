@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "observer-adapters"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "observer-core",
@@ -893,7 +893,7 @@ dependencies = [
 
 [[package]]
 name = "observer-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "chrono-tz",
@@ -906,7 +906,7 @@ dependencies = [
 
 [[package]]
 name = "observer-domain"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "hex",
@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "second-observer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1284,7 +1284,7 @@ dependencies = [
 
 [[package]]
 name = "second-observer-upload"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",

@@ -12,6 +12,7 @@ Each release also publishes:
 - `SHA256SUMS`, covering every release archive;
 - one Sigstore bundle per archive;
 - a CycloneDX SBOM for each archive;
+- one sanitized Cargo dependency record for each target;
 - a signed `RELEASE-MANIFEST.json`, its Sigstore bundle, source commit, and release notes.
 
 ## Signing and verification
@@ -22,7 +23,7 @@ Release automation rejects lightweight tags, builds from an annotated tag with l
 
 ## SBOM requirements
 
-Each CycloneDX SBOM describes its packaged release output. The signed release manifest binds the source commit, target triples, archive digests, and SBOM digests; its Cargo-metadata set digest binds the locked Rust dependency record. The release assets must not include participant files, study exports, local paths, environment values, credentials, or build-host identifiers.
+Each CycloneDX SBOM derives from the locked Cargo package and resolve graph, not a target-directory scan. Each sanitized dependency record identifies package name, version, source, checksum, license, and dependency edges without manifest paths, workspace paths, environment values, or build-host identifiers. The signed release manifest binds the source commit, target triples, archive digests, dependency-record digests, and SBOM digests. Release assets must not include participant files, study exports, local paths, environment values, credentials, or build-host identifiers.
 
 ## Revocation
 

@@ -85,18 +85,21 @@ jobs:
           $archive = "second-observer-$releaseTag-${{ matrix.target }}.zip"
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path target/${{ matrix.target }}/release/second-observer.exe,target/${{ matrix.target }}/release/second-observer-upload.exe -DestinationPath "dist/$archive"
-          (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLower() + "  $archive" | Set-Content -Encoding ascii "dist/$archive.sha256"
-      - name: Generate CycloneDX SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          path: target/${{ matrix.target }}/release
-          format: cyclonedx-json
-          output-file: dist/second-observer-${{ matrix.target }}.cdx.json
-          upload-artifact: false
-          upload-release-assets: false
-      - name: Record locked Cargo dependency metadata
+          $checksum = (Get-FileHash "dist/$archive" -Algorithm SHA256).Hash.ToLowerInvariant() + "  $archive`n"
+          [System.IO.File]::WriteAllText(
+            (Join-Path $PWD "dist/$archive.sha256"),
+            $checksum,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+      - name: Generate sanitized dependency record and CycloneDX SBOM
         shell: bash
-        run: cargo metadata --locked --format-version 1 > "dist/second-observer-${{ matrix.target }}.cargo-metadata.json"
+        run: |
+          source_commit="$(git rev-parse "${RELEASE_TAG}^{commit}")"
+          node scripts/release-metadata.mjs \
+            --target "${{ matrix.target }}" \
+            --release-tag "${RELEASE_TAG}" \
+            --source-commit "${source_commit}" \
+            --out-dir dist
       - uses: sigstore/cosign-installer@v3
       - name: Sign archive digest
         shell: bash
@@ -131,14 +134,22 @@ jobs:
         shell: bash
         run: |
           cd dist
+          if LC_ALL=C grep -q $'\r' ./*.sha256; then
+            echo "CRLF checksum sidecars are forbidden" >&2
+            exit 1
+          fi
           cat *.sha256 > SHA256SUMS
-          sha256sum -c SHA256SUMS
+          if LC_ALL=C grep -q $'\r' SHA256SUMS; then
+            echo "CRLF checksum manifest is forbidden" >&2
+            exit 1
+          fi
+          sha256sum --strict -c SHA256SUMS
           release_tag="${RELEASE_TAG}"
           [[ "$(git -C .. cat-file -t "refs/tags/${release_tag}")" == "tag" ]]
           source_commit="$(git -C .. rev-parse "${release_tag}^{commit}")"
-          metadata_digest="$(sha256sum ./*.cargo-metadata.json | sha256sum | awk '{print $1}')"
+          dependency_record_digest="$(sha256sum ./*.dependency-record.json | sha256sum | awk '{print $1}')"
           {
-            printf '{"release_tag":"%s","source_commit":"%s","cargo_metadata_set_sha256":"%s","archives":[' "${release_tag}" "${source_commit}" "${metadata_digest}"
+            printf '{"release_tag":"%s","source_commit":"%s","dependency_record_set_sha256":"%s","archives":[' "${release_tag}" "${source_commit}" "${dependency_record_digest}"
             first=1
             for archive in ./*.tar.gz ./*.zip; do
               [[ -f "${archive}" ]] || continue
@@ -150,6 +161,15 @@ jobs:
               [[ "${first}" == 1 ]] || printf ','
               first=0
               printf '{"name":"%s","target":"%s","sha256":"%s"}' "${name}" "${target}" "${digest}"
+            done
+            printf '],"dependency_records":['
+            first=1
+            for record in ./*.dependency-record.json; do
+              [[ -f "${record}" ]] || continue
+              digest="$(sha256sum "${record}" | awk '{print $1}')"
+              [[ "${first}" == 1 ]] || printf ','
+              first=0
+              printf '{"name":"%s","sha256":"%s"}' "${record#./}" "${digest}"
             done
             printf '],"sboms":['
             first=1
