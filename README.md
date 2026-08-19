@@ -8,16 +8,24 @@ It produces aggregate study exports. It does not make productivity, correctness,
 
 [verified] This repository currently contains the public participant, privacy, security, and release surface.
 
-[verified] Release `v0.1.3` provides the `second-observer` collector and isolated `second-observer-upload` uploader for macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64. Published checksums, Sigstore identities, archive contents, SBOM graphs, sanitized dependency records, and signed manifest bindings pass independent download verification.
+[verified] Release `v0.1.4` provides the `second-observer` collector and isolated `second-observer-upload` uploader for macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64. Published checksums, Sigstore identities, archive contents, SBOM graphs, sanitized dependency records, and signed manifest bindings pass independent download verification.
 
 ## Participant workflow
 
-Use a signed release binary. Rust is not required.
+```text
+second-observer run
+```
+
+One interactive command. It asks for the home directory, timezone, adapters, phase, window
+length, and content-analysis choice, shows the consent manifest before collecting and the entire
+payload before exporting, and writes nothing until you approve each. No agent required.
+
+Every step is also available as a separate non-interactive command that infers nothing:
 
 ```text
 second-observer discover --home <participant-home>
-second-observer consent init --phase baseline
-second-observer collect --profile retained-history --baseline <days> --phase baseline --home <participant-home> --timezone <iana-timezone>
+second-observer consent init --phase <baseline|post> --adapter <id> [--adapter <id> ...]
+second-observer collect --profile retained-history --baseline <days> --phase <baseline|post> --home <participant-home> --timezone <iana-timezone>
 second-observer preview
 second-observer export
 second-observer verify <export>
@@ -56,13 +64,27 @@ Each prompt runs the same deterministic workflow. The agent must not inspect his
 
 ## Release verification
 
-Each release asset will include a SHA-256 checksum and Sigstore bundle. Verify both before execution:
+Two checks, and they are not equally available. Do the first one always. Do the second one if
+you have `cosign`; its absence is not a reason to stop.
+
+**Required — checksum.** Proves the archive was not altered in transit or storage. `shasum`
+ships with macOS and Linux; Windows has `Get-FileHash`.
 
 ```text
-shasum -a 256 -c SHA256SUMS
+shasum -a 256 -c SHA256SUMS --ignore-missing
+```
+
+**Recommended — signature.** Proves the archive was built by this repository's release workflow
+and not merely by someone who could also edit `SHA256SUMS`. Requires
+[cosign](https://github.com/sigstore/cosign) (`brew install cosign`).
+
+```text
 cosign verify-blob --bundle <asset>.sigstore.json --certificate-identity-regexp 'https://github.com/ontigon/second-observer/.github/workflows/release.yml@refs/tags/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com <asset>
 cosign verify-blob --bundle RELEASE-MANIFEST.sigstore.json --certificate-identity-regexp 'https://github.com/ontigon/second-observer/.github/workflows/release.yml@refs/tags/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com RELEASE-MANIFEST.json
 ```
+
+If you run only the checksum, you have verified integrity but not provenance. That is a weaker
+guarantee, stated here so the choice is explicit rather than accidental.
 
 On Windows PowerShell, verify the selected archive against `SHA256SUMS` before running the same
 `cosign verify-blob` commands:

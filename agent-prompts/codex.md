@@ -1,21 +1,39 @@
 # Codex prompt
 
+The collector is interactive and drives itself. An agent's only useful job is getting you a
+verified binary; after that it should get out of the way, because `second-observer run` asks
+you the questions directly and an agent in the middle can only mistranslate your answers.
+
 ```text
-Use only the released Second Observer binaries and run this deterministic workflow exactly:
+Help me install Second Observer. Do only these steps and then stop.
 
-0. Download the correct `v0.1.3` archive for this machine from `https://github.com/ontigon/second-observer/releases/tag/v0.1.3`. Verify its SHA-256 entry and Sigstore bundle using the repository release instructions, then extract it. Do not build from source.
-1. Ask me for the collection phase (`baseline` or `post`), explicit participant home directory, IANA timezone, and whether to enable optional local content analysis. Do not infer any of them.
-2. second-observer discover --home <participant-home>
-3. Ask me for the window length in days and the adapter list. Approve only adapters that step 2 reported as `observed`; approving an unused tool makes every later comparison INCOMPARABLE. Run `second-observer consent init --phase <baseline|post> --adapter <id> [--adapter <id> ...]`. Add `--content-analysis` only if I explicitly approved it in step 1.
-4. Show me the consent manifest and wait for my explicit approval before collection.
-5. After approval: second-observer collect --profile retained-history --baseline <days> --phase <baseline|post> --home <participant-home> --timezone <iana-timezone>
-   The baseline and post phases must use the same <days> value and the same adapter list, or the pair is refused as INCOMPARABLE.
-6. second-observer preview
-7. Show me the exact preview and excluded-field assertions. Do not upload.
-8. If I explicitly approve the shown export and provide a study code, run:
-   second-observer export
-   second-observer verify <export>
-   second-observer-upload send <export> --study-code <code> --confirm
+1. Detect this machine's OS and architecture.
+2. Download the matching archive and SHA256SUMS from the latest release of
+   github.com/ontigon/second-observer. Use `gh release download` if the GitHub CLI is
+   available, otherwise curl. Do not use a web search or a browser.
+3. Verify the checksum and show me the output:
+       shasum -a 256 -c SHA256SUMS --ignore-missing
+   Stop if it does not say OK.
+4. If `cosign` is on PATH, also verify the Sigstore bundle using the commands in the
+   repository README and show me the output. If `cosign` is not installed, say so, say that
+   this leaves provenance unverified, and continue — do not treat it as a failure and do not
+   install anything to work around it.
+5. Extract the archive. On macOS, if the binary carries com.apple.quarantine, tell me the
+   `xattr -d` command and let me decide.
+6. Tell me the full path to the extracted binary, then stop.
 
-Do not inspect, search, summarize, or reason over local histories yourself. Do not infer consent, phase, home directory, timezone, window length, adapter list, content-analysis choice, study code, add adapters, change collection scope, execute detected tools, or call alternative collection scripts. Do not upload unless I explicitly approve the exact previewed export in this conversation. Stop on any error or difference from the approved scope and report it without retrying through another method.
+Do not run the collector. Do not run discover, consent, collect, preview, export, or compare.
+Do not read, search, or summarise my local history. Do not create a .second-observer directory.
+I will run `second-observer run` myself from my home directory and answer its questions.
 ```
+
+Then, in your own terminal:
+
+```text
+cd ~
+/path/to/second-observer run
+```
+
+It asks for a home directory, timezone, which adapters to approve, baseline or post, window
+length, and whether to enable local content analysis. It shows you the consent manifest before
+collecting and the entire payload before exporting. Nothing uploads.
