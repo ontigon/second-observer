@@ -436,6 +436,19 @@ fn guided_run(command: RunCommand) -> anyhow::Result<()> {
 /// Renders an enum using its serde name. `{:?}` lowercased silently drops the
 /// underscore, so `DetectedUnmeasured` printed as `detectedunmeasured` and no
 /// longer matched the legend or the documented status vocabulary.
+/// A ratio arriving as an f64 prints as `0.050505050505050504`, which asserts
+/// eighteen significant figures for what is five events out of ninety-nine. Whole
+/// numbers stay whole; everything else is cut to four decimals.
+fn format_metric_value(value: Option<f64>) -> String {
+    match value {
+        // A missing value is a coverage fact. Printing 0 would read as "this
+        // happened zero times".
+        None => "not measured".to_owned(),
+        Some(value) if value.fract() == 0.0 && value.abs() < 1e15 => format!("{value:.0}"),
+        Some(value) => format!("{value:.4}"),
+    }
+}
+
 fn serde_name<T: serde::Serialize + std::fmt::Debug>(value: &T) -> String {
     serde_json::to_value(value)
         .ok()
@@ -537,7 +550,7 @@ fn choose_adapters(
 }
 
 fn choose_phase_window_content() -> anyhow::Result<(Phase, u16, bool)> {
-    let phase = if confirm("\nIs this your first (baseline) collection?")? {
+    let phase = if confirm_with_default("\nIs this your first (baseline) collection?", true)? {
         Phase::Baseline
     } else {
         Phase::Post
@@ -565,7 +578,7 @@ fn choose_phase_window_content() -> anyhow::Result<(Phase, u16, bool)> {
     println!("\nOptional local content analysis derives relay, routing, and correction heuristics");
     println!("from message and command text on this machine. No text is stored or exported; only");
     println!("aggregate numbers are, and they are labelled `local_content_heuristic`.");
-    let content_analysis = confirm("Enable local content analysis?")?;
+    let content_analysis = confirm_with_default("Enable local content analysis?", false)?;
     Ok((phase, window_days, content_analysis))
 }
 
@@ -690,6 +703,8 @@ fn prompt_with_default(question: &str, default: &str) -> anyhow::Result<String> 
     }
 }
 
+/// No default. Used for the two gates that authorise an action -- collecting and
+/// writing an export -- where an accidental Enter must not stand in for consent.
 fn confirm(question: &str) -> anyhow::Result<bool> {
     loop {
         print!("{question} [y/n]\n> ");
@@ -698,6 +713,23 @@ fn confirm(question: &str) -> anyhow::Result<bool> {
             "y" | "yes" => return Ok(true),
             "n" | "no" => return Ok(false),
             _ => println!("  Answer y or n."),
+        }
+    }
+}
+
+/// Enter accepts the shown default. Used only for questions that select a shape,
+/// never for the consent gates. Every other prompt in this flow takes a default,
+/// so a y/n that silently rejects Enter reads as a broken prompt.
+fn confirm_with_default(question: &str, default: bool) -> anyhow::Result<bool> {
+    let hint = if default { "[Y/n]" } else { "[y/N]" };
+    loop {
+        print!("{question} {hint}\n> ");
+        std::io::stdout().flush()?;
+        match read_line()?.to_ascii_lowercase().as_str() {
+            "" => return Ok(default),
+            "y" | "yes" => return Ok(true),
+            "n" | "no" => return Ok(false),
+            _ => println!("  Answer y or n, or press Enter for the default."),
         }
     }
 }
@@ -760,6 +792,10 @@ fn render_export(export: &observer_domain::StudyExport) {
     }
 
     println!("\nMeasurements");
+    println!(
+        "    {:<28} {:>12} {:<12} {:<24} observed/eligible",
+        "metric", "value", "unit", "evidence"
+    );
     let mut adapters = export.metrics.iter().map(|m| m.adapter_id.as_str()).collect::<Vec<_>>();
     adapters.sort_unstable();
     adapters.dedup();
@@ -775,16 +811,22 @@ fn render_export(export: &observer_domain::StudyExport) {
             }
             println!("  {adapter} / {}", window.id);
             for metric in rows {
-                let value = match metric.value {
-                    Some(value) => format!("{value}"),
-                    // A missing value is a coverage fact. Printing 0 here would
-                    // read as "this happened zero times".
-                    None => "not measured".to_owned(),
-                };
-                println!("    {:<28} {:>14} {}", metric.metric_id, value, metric.unit);
+                println!(
+                    "    {:<28} {:>12} {:<12} {:<24} {}/{}",
+                    metric.metric_id,
+                    format_metric_value(metric.value),
+                    metric.unit,
+                    serde_name(&metric.evidence_class),
+                    metric.observed_count,
+                    metric.eligible_count
+                );
             }
         }
     }
+    println!("\n  observed_counter = counted directly from records.");
+    println!("  deterministic_derived = computed from those counts by a fixed rule.");
+    println!("  local_content_heuristic = inferred locally from message or command text.");
+    println!("  A heuristic is weaker evidence than a count. They are never the same claim.");
 
     println!("\nCoverage");
     for entry in &export.coverage {
