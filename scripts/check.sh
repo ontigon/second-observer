@@ -21,7 +21,7 @@ metadata_check_dir="$(mktemp -d)"
 trap 'rm -rf "${metadata_check_dir}"' EXIT
 node scripts/release-metadata.mjs \
   --target x86_64-unknown-linux-gnu \
-  --release-tag v0.1.1 \
+  --release-tag v0.1.2 \
   --source-commit "$(git rev-parse HEAD)" \
   --out-dir "${metadata_check_dir}"
 jq -e '

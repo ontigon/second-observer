@@ -86,7 +86,10 @@ const outputDirectory = resolve(argument("--out-dir"));
 if (!/^[0-9a-f]{40}$/.test(sourceCommit)) fail("source commit must be a lowercase 40-character SHA-1");
 
 const metadata = JSON.parse(
-  execFileSync("cargo", ["metadata", "--locked", "--format-version", "1"], { encoding: "utf8" }),
+  execFileSync("cargo", ["metadata", "--locked", "--format-version", "1"], {
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  }),
 );
 const lockBytes = readFileSync("Cargo.lock");
 const lockPackages = parseLock(lockBytes.toString("utf8"));
