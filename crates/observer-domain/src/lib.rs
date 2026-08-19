@@ -147,7 +147,8 @@ impl ConsentManifest {
             || phase_count != 1
         {
             return Err(DomainError::InvalidContract(
-                "consent must approve retained_history and exactly one measurement phase".to_owned(),
+                "consent must approve retained_history and exactly one measurement phase"
+                    .to_owned(),
             ));
         }
         if self.approved_adapters.is_empty()
@@ -443,11 +444,9 @@ impl StudyExport {
         }
         if self.windows.len() < 2
             || !self.windows.iter().any(|window| window.kind == WindowKind::RetainedHistory)
-            || (usize::from(
-                self.windows.iter().any(|window| window.kind == WindowKind::Baseline),
-            ) + usize::from(
-                self.windows.iter().any(|window| window.kind == WindowKind::Post),
-            )) != 1
+            || (usize::from(self.windows.iter().any(|window| window.kind == WindowKind::Baseline))
+                + usize::from(self.windows.iter().any(|window| window.kind == WindowKind::Post)))
+                != 1
         {
             return Err(DomainError::InvalidContract(
                 "required collection windows are absent".to_owned(),
