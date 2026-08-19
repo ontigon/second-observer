@@ -63,6 +63,16 @@ cosign verify-blob --bundle <asset>.sigstore.json --certificate-identity-regexp 
 cosign verify-blob --bundle RELEASE-MANIFEST.sigstore.json --certificate-identity-regexp 'https://github.com/ontigon/second-observer/.github/workflows/release.yml@refs/tags/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com RELEASE-MANIFEST.json
 ```
 
+On Windows PowerShell, verify the selected archive against `SHA256SUMS` before running the same
+`cosign verify-blob` commands:
+
+```powershell
+$archive = "second-observer-<version>-x86_64-pc-windows-msvc.zip"
+$expected = ((Get-Content SHA256SUMS | Where-Object { $_ -match ([regex]::Escape($archive) + '$') }) -split '\s+')[0]
+$actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "SHA-256 mismatch for $archive" }
+```
+
 See [the release policy](docs/release/RELEASE_POLICY.md) for release contents, verification constraints, and SBOM requirements.
 
 ## License
