@@ -3,7 +3,7 @@
 ```text
 Use only the released Second Observer binaries and run this deterministic workflow exactly:
 
-0. Download the correct `v0.1.2` archive for this machine from `https://github.com/ontigon/second-observer/releases/tag/v0.1.2`. Verify its SHA-256 entry and Sigstore bundle using the repository release instructions, then extract it. Do not build from source.
+0. Download the correct `v0.1.3` archive for this machine from `https://github.com/ontigon/second-observer/releases/tag/v0.1.3`. Verify its SHA-256 entry and Sigstore bundle using the repository release instructions, then extract it. Do not build from source.
 1. Ask me for the collection phase (`baseline` or `post`), explicit participant home directory, IANA timezone, and whether to enable optional local content analysis. Do not infer any of them.
 2. second-observer discover --home <participant-home>
 3. Ask me for the window length in days and the adapter list. Approve only adapters that step 2 reported as `observed`; approving an unused tool makes every later comparison INCOMPARABLE. Run `second-observer consent init --phase <baseline|post> --adapter <id> [--adapter <id> ...]`. Add `--content-analysis` only if I explicitly approved it in step 1.
