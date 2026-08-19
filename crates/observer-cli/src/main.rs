@@ -28,6 +28,8 @@ struct Cli {
 enum Command {
     /// Guided end-to-end collection. Asks for what it needs and needs no other command.
     Run(Box<RunCommand>),
+    /// List every collection taken on this machine, newest last.
+    Snapshots(SnapshotsCommand),
     /// Inspect the embedded registry without reading sources or executing applications.
     Discover(DiscoverCommand),
     /// Create a reviewable consent manifest.
@@ -110,7 +112,8 @@ struct CollectCommand {
     identity: PathBuf,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum Phase {
     Baseline,
     Post,
@@ -153,6 +156,22 @@ struct RunCommand {
     pending: PathBuf,
     #[arg(long, default_value_os_t = default_identity_path())]
     identity: PathBuf,
+    #[arg(long, default_value_os_t = default_profile_path())]
+    profile: PathBuf,
+    #[arg(long, default_value_os_t = default_snapshots_path())]
+    snapshots: PathBuf,
+    /// Reuse the stored answers without being asked. The consent and payload gates still apply.
+    #[arg(long)]
+    repeat: bool,
+}
+
+#[derive(Debug, Args)]
+struct SnapshotsCommand {
+    #[arg(long, default_value_os_t = default_snapshots_path())]
+    snapshots: PathBuf,
+    /// Print the machine-readable index instead of the table.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Debug, Args)]
@@ -176,10 +195,19 @@ fn default_identity_path() -> PathBuf {
     PathBuf::from(DEFAULT_STATE_DIRECTORY).join("study-identity.json")
 }
 
+fn default_profile_path() -> PathBuf {
+    PathBuf::from(DEFAULT_STATE_DIRECTORY).join("profile.json")
+}
+
+fn default_snapshots_path() -> PathBuf {
+    PathBuf::from(DEFAULT_STATE_DIRECTORY).join("snapshots.json")
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Run(command) => guided_run(*command),
+        Command::Run(command) => guided_run(&command),
+        Command::Snapshots(command) => snapshots_command(&command),
         Command::Discover(command) => discover_command(command),
         Command::Consent(ConsentCommand { command: ConsentSubcommand::Init(command) }) => {
             consent_init(command)
@@ -326,7 +354,7 @@ fn print_json<T: serde::Serialize>(value: &T) -> anyhow::Result<()> {
 // requires confirmation is not inference.
 // ---------------------------------------------------------------------------
 
-fn guided_run(command: RunCommand) -> anyhow::Result<()> {
+fn guided_run(command: &RunCommand) -> anyhow::Result<()> {
     if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
         anyhow::bail!(
             "`run` is interactive and needs a terminal. Use the individual subcommands \
@@ -343,43 +371,14 @@ fn guided_run(command: RunCommand) -> anyhow::Result<()> {
     );
     rule();
 
-    // 1. Home directory ----------------------------------------------------
-    let home = resolve_home(command.home)?;
-
-    // 2. Timezone ----------------------------------------------------------
-    let timezone = resolve_timezone(command.timezone)?;
-
-    // 3. Discovery ---------------------------------------------------------
-    println!("\nChecking which tools are present. Nothing is read or executed yet.\n");
-    let coverage = discover_coverage(&home, &command.git_dirs)?;
-    print_coverage_table(&coverage);
-
-    let observed = coverage
-        .iter()
-        .filter(|entry| entry.status == observer_domain::CoverageStatus::Observed)
-        .map(|entry| entry.adapter_id.clone())
-        .collect::<Vec<_>>();
-
-    if observed.is_empty() {
-        anyhow::bail!(
-            "No adapter returned `observed`, so there is nothing to measure on this machine."
-        );
-    }
-
-    // 4. Adapter selection -------------------------------------------------
-    // Comparison requires every approved adapter to be observed in both phases,
-    // so approving a tool the participant does not use guarantees INCOMPARABLE
-    // on every later pair. Defaulting to the observed set is the whole reason
-    // this flow exists.
-    let adapters = choose_adapters(&coverage, &observed)?;
-
-    // 5. Phase, window, and content analysis --------------------------------
-    let (phase, window_days, content_analysis) = choose_phase_window_content()?;
+    let profile = resolve_profile(command)?;
+    let RunProfile { home, timezone, adapters, window_days, content_analysis, phase } = &profile;
+    let (window_days, content_analysis, phase) = (*window_days, *content_analysis, *phase);
 
     // 6. Consent -----------------------------------------------------------
     let now = Utc::now();
-    let manifest = build_consent(now, command.expires_in_days, &adapters, phase, content_analysis)?;
-    show_consent(&manifest, phase, window_days, &home, &timezone);
+    let manifest = build_consent(now, command.expires_in_days, adapters, phase, content_analysis)?;
+    show_consent(&manifest, phase, window_days, home, timezone);
     if !confirm("Collect with exactly this consent?")? {
         println!("Stopped. Nothing was collected and no state was written.");
         return Ok(());
@@ -391,8 +390,8 @@ fn guided_run(command: RunCommand) -> anyhow::Result<()> {
     let export = run_collection(
         &manifest,
         now,
-        &home,
-        &timezone,
+        home,
+        timezone,
         &command.git_dirs,
         &command.identity,
         phase,
@@ -420,6 +419,25 @@ fn guided_run(command: RunCommand) -> anyhow::Result<()> {
     let output = PathBuf::from("exports").join(format!("{}.study-export", export.study.run_id));
     let digest = export_finalized(&command.pending, &output)?;
     verify_file(&output)?;
+    write_profile(&command.profile, &profile)?;
+    record_snapshot(
+        &command.snapshots,
+        SnapshotRecord {
+            run_id: export.study.run_id.clone(),
+            collected_at: now,
+            phase,
+            window_days,
+            window_id: export
+                .windows
+                .iter()
+                .find(|window| window.kind == phase.window())
+                .map_or_else(String::new, |window| window.id.clone()),
+            adapters: adapters.clone(),
+            content_analysis,
+            payload_sha256: digest.clone(),
+            path: output.clone(),
+        },
+    )?;
     rule();
     println!("Export written and verified.");
     println!("  file    {}", output.display());
@@ -459,6 +477,68 @@ fn serde_name<T: serde::Serialize + std::fmt::Debug>(value: &T) -> String {
 /// The flag-based subcommands take an explicit `--home` and never consult the
 /// environment. The guided flow may *propose* one, which the participant then
 /// confirms or replaces. A proposal awaiting confirmation is not inference.
+fn resolve_profile(command: &RunCommand) -> anyhow::Result<RunProfile> {
+    // 0. Stored answers ----------------------------------------------------
+    // Taking a second reading should not cost six questions. It stays a separate
+    // snapshot either way; only the asking is skipped.
+    let stored = read_profile(&command.profile);
+    let reuse = match &stored {
+        Some(profile) if command.repeat => true,
+        Some(profile) => {
+            println!("Last collection on this machine:");
+            describe_profile(profile);
+            confirm_with_default("\nTake another snapshot with these same answers?", true)?
+        }
+        None => false,
+    };
+
+    if reuse {
+        let profile = stored.expect("reuse implies a stored profile");
+        // Re-discover anyway: an approved adapter may have gone missing since,
+        // and collecting against a stale assumption would misreport it as a
+        // change in behaviour.
+        println!("\nChecking which tools are present. Nothing is read or executed yet.\n");
+        let coverage = discover_coverage(&profile.home, &command.git_dirs)?;
+        print_coverage_table(&coverage);
+        warn_on_lost_adapters(&coverage, &profile.adapters);
+        Ok(profile)
+    } else {
+        // 1. Home directory ------------------------------------------------
+        let home =
+            resolve_home(command.home.clone().or_else(|| stored.as_ref().map(|p| p.home.clone())))?;
+
+        // 2. Timezone ------------------------------------------------------
+        let timezone = resolve_timezone(
+            command.timezone.clone().or_else(|| stored.as_ref().map(|p| p.timezone.clone())),
+        )?;
+
+        // 3. Discovery -----------------------------------------------------
+        println!("\nChecking which tools are present. Nothing is read or executed yet.\n");
+        let coverage = discover_coverage(&home, &command.git_dirs)?;
+        print_coverage_table(&coverage);
+
+        let observed = coverage
+            .iter()
+            .filter(|entry| entry.status == observer_domain::CoverageStatus::Observed)
+            .map(|entry| entry.adapter_id.clone())
+            .collect::<Vec<_>>();
+
+        if observed.is_empty() {
+            anyhow::bail!(
+                "No adapter returned `observed`, so there is nothing to measure on this machine."
+            );
+        }
+
+        // 4. Adapter selection ---------------------------------------------
+        let proposed = stored.as_ref().map_or(observed.clone(), |p| p.adapters.clone());
+        let adapters = choose_adapters(&coverage, &observed, &proposed)?;
+
+        // 5. Phase, window, and content analysis ----------------------------
+        let (phase, window_days, content_analysis) = choose_phase_window_content(stored.as_ref())?;
+        Ok(RunProfile { home, timezone, adapters, window_days, content_analysis, phase })
+    }
+}
+
 fn resolve_home(supplied: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     let home = if let Some(home) = supplied {
         home
@@ -511,13 +591,14 @@ fn resolve_timezone(supplied: Option<String>) -> anyhow::Result<String> {
 fn choose_adapters(
     coverage: &[observer_domain::Coverage],
     observed: &[String],
+    proposed: &[String],
 ) -> anyhow::Result<Vec<String>> {
     println!("\nApprove only tools you actually use. Comparison later requires every approved");
     println!("adapter to be observed in both phases, so approving an unused tool makes every");
     println!("comparison INCOMPARABLE.");
     loop {
         let answer =
-            prompt_with_default("Adapters to approve (comma-separated)", &observed.join(", "))?;
+            prompt_with_default("Adapters to approve (comma-separated)", &proposed.join(", "))?;
         let chosen = answer
             .split(',')
             .map(|part| part.trim().to_owned())
@@ -549,8 +630,11 @@ fn choose_adapters(
     }
 }
 
-fn choose_phase_window_content() -> anyhow::Result<(Phase, u16, bool)> {
-    let phase = if confirm_with_default("\nIs this your first (baseline) collection?", true)? {
+fn choose_phase_window_content(stored: Option<&RunProfile>) -> anyhow::Result<(Phase, u16, bool)> {
+    let phase = if confirm_with_default(
+        "\nIs this your first (baseline) collection?",
+        stored.is_none_or(|profile| profile.phase == Phase::Baseline),
+    )? {
         Phase::Baseline
     } else {
         Phase::Post
@@ -564,7 +648,9 @@ fn choose_phase_window_content() -> anyhow::Result<(Phase, u16, bool)> {
     let window_days = loop {
         let answer = prompt_with_default(
             "Window length in days (baseline and post must match)",
-            &observer_core::DEFAULT_WINDOW_DAYS.to_string(),
+            &stored
+                .map_or(observer_core::DEFAULT_WINDOW_DAYS, |profile| profile.window_days)
+                .to_string(),
         )?;
         match answer.parse::<u16>() {
             Ok(value) if observer_core::WINDOW_DAYS_RANGE.contains(&value) => break value,
@@ -578,7 +664,10 @@ fn choose_phase_window_content() -> anyhow::Result<(Phase, u16, bool)> {
     println!("\nOptional local content analysis derives relay, routing, and correction heuristics");
     println!("from message and command text on this machine. No text is stored or exported; only");
     println!("aggregate numbers are, and they are labelled `local_content_heuristic`.");
-    let content_analysis = confirm_with_default("Enable local content analysis?", false)?;
+    let content_analysis = confirm_with_default(
+        "Enable local content analysis?",
+        stored.is_some_and(|profile| profile.content_analysis),
+    )?;
     Ok((phase, window_days, content_analysis))
 }
 
@@ -853,4 +942,134 @@ fn render_export(export: &observer_domain::StudyExport) {
         println!("  {nonclaim}");
     }
     rule();
+}
+
+// ---------------------------------------------------------------------------
+// Repeat runs and snapshots
+//
+// Re-answering six questions to take a second reading is friction that
+// discourages taking readings. The profile stores the last accepted answers so a
+// repeat is one keypress, and the snapshot index records every collection so
+// reporting can choose between them later rather than being handed whichever one
+// happened to be last.
+//
+// What a repeat does NOT skip: the consent summary and its explicit y, and the
+// full payload review and its explicit y. Those are the two gates that authorise
+// an action. Cheapening the questions is a usability fix; cheapening a gate would
+// be a consent defect.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct RunProfile {
+    home: PathBuf,
+    timezone: String,
+    adapters: Vec<String>,
+    window_days: u16,
+    content_analysis: bool,
+    phase: Phase,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct SnapshotRecord {
+    run_id: String,
+    collected_at: chrono::DateTime<Utc>,
+    phase: Phase,
+    window_days: u16,
+    window_id: String,
+    adapters: Vec<String>,
+    content_analysis: bool,
+    payload_sha256: String,
+    path: PathBuf,
+}
+
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+struct SnapshotIndex {
+    snapshots: Vec<SnapshotRecord>,
+}
+
+fn read_profile(path: &std::path::Path) -> Option<RunProfile> {
+    serde_json::from_slice(&std::fs::read(path).ok()?).ok()
+}
+
+fn write_profile(path: &std::path::Path, profile: &RunProfile) -> anyhow::Result<()> {
+    Ok(observer_core::atomic_write_owner_only(path, &serde_json::to_vec_pretty(profile)?)?)
+}
+
+fn read_snapshots(path: &std::path::Path) -> SnapshotIndex {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+/// Appends rather than replaces. Each collection receives a fresh run ID, so
+/// exports never overwrite one another; the index is what makes the accumulated
+/// set selectable instead of merely present on disk.
+fn record_snapshot(path: &std::path::Path, record: SnapshotRecord) -> anyhow::Result<()> {
+    let mut index = read_snapshots(path);
+    index.snapshots.push(record);
+    index.snapshots.sort_by_key(|snapshot| snapshot.collected_at);
+    Ok(observer_core::atomic_write_owner_only(path, &serde_json::to_vec_pretty(&index)?)?)
+}
+
+/// A previously approved adapter that no longer reports `observed` would enter
+/// the export as a coverage change, and comparison would refuse the pair. Say so
+/// before collecting rather than after.
+fn warn_on_lost_adapters(coverage: &[observer_domain::Coverage], approved: &[String]) {
+    let lost = approved
+        .iter()
+        .filter(|id| {
+            coverage.iter().any(|entry| {
+                &&entry.adapter_id == id
+                    && entry.status != observer_domain::CoverageStatus::Observed
+            })
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if !lost.is_empty() {
+        println!(
+            "  Note: {} no longer reports `observed`. This snapshot will record that as a",
+            lost.join(", ")
+        );
+        println!(
+            "  coverage fact, and comparison against an earlier snapshot will refuse the pair."
+        );
+    }
+}
+
+fn describe_profile(profile: &RunProfile) {
+    println!("  phase              {:?}", profile.phase);
+    println!("  window             {} days", profile.window_days);
+    println!("  home               {}", profile.home.display());
+    println!("  timezone           {}", profile.timezone);
+    println!("  adapters           {}", profile.adapters.join(", "));
+    println!("  content analysis   {}", if profile.content_analysis { "yes" } else { "no" });
+}
+
+fn snapshots_command(command: &SnapshotsCommand) -> anyhow::Result<()> {
+    let index = read_snapshots(&command.snapshots);
+    if command.json {
+        return print_json(&index);
+    }
+    if index.snapshots.is_empty() {
+        println!("No snapshots recorded yet. Run `second-observer run` to take one.");
+        return Ok(());
+    }
+    println!("  {:<22} {:<10} {:<8} {:<10} file", "collected (UTC)", "phase", "window", "adapters");
+    for snapshot in &index.snapshots {
+        println!(
+            "  {:<22} {:<10} {:<8} {:<10} {}",
+            snapshot.collected_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+            format!("{:?}", snapshot.phase).to_lowercase(),
+            format!("{}d", snapshot.window_days),
+            snapshot.adapters.len(),
+            snapshot.path.display()
+        );
+    }
+    println!(
+        "\n  {} snapshot(s). Compare any matching baseline/post pair with `compare`; a pair whose",
+        index.snapshots.len()
+    );
+    println!("  window lengths differ is refused rather than compared.");
+    Ok(())
 }

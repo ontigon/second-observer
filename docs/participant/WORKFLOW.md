@@ -37,7 +37,44 @@ xattr -d com.apple.quarantine second-observer
 Run the collector from your home directory or a scratch folder, not from inside a source
 checkout: it writes its state into `.second-observer/` in the current directory.
 
+## Running it again
+
+Every run is a separate snapshot. Nothing is overwritten: each collection gets a fresh run ID
+and its own export file, and all of them are recorded in an index you can select from later.
+
+The second time you run it, it shows the answers you used last time and offers to reuse them:
+
+```text
+Take another snapshot with these same answers? [Y/n]
+```
+
+Press Enter and it goes straight to collecting. To skip even that question:
+
+```text
+second-observer run --repeat
+```
+
+`--repeat` reuses the stored answers with no questions at all. It does **not** skip the consent
+summary or the payload review — those two still require an explicit `y`, because an accidental
+keystroke must never stand in for consent.
+
+Discovery runs again on every repeat. If a tool you previously approved has stopped reporting
+`observed`, it says so before collecting, because that becomes a coverage change rather than a
+change in your behaviour.
+
+List what you have collected:
+
+```text
+second-observer snapshots
+second-observer snapshots --json     # run id, window, adapters, digest, path
+```
+
+Take as many as you like. Choosing which snapshot to use for a report or a benchmark is a
+decision you make later, from that list.
+
 ## What `run` asks you
+
+These are asked on your first run, and proposed as defaults on every run after it.
 
 1. **Home directory.** It proposes yours; confirm or replace it.
 2. **Timezone.** It proposes the system zone. It requires an IANA name such as

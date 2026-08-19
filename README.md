@@ -8,7 +8,7 @@ It produces aggregate study exports. It does not make productivity, correctness,
 
 [verified] This repository currently contains the public participant, privacy, security, and release surface.
 
-[verified] Release `v0.1.5` provides the `second-observer` collector and isolated `second-observer-upload` uploader for macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64. Published checksums, Sigstore identities, archive contents, SBOM graphs, sanitized dependency records, and signed manifest bindings pass independent download verification.
+[verified] Release `v0.1.6` provides the `second-observer` collector and isolated `second-observer-upload` uploader for macOS arm64/x86-64, Linux arm64/x86-64, and Windows x86-64. Published checksums, Sigstore identities, archive contents, SBOM graphs, sanitized dependency records, and signed manifest bindings pass independent download verification.
 
 ## Participant workflow
 
@@ -19,6 +19,10 @@ second-observer run
 One interactive command. It asks for the home directory, timezone, adapters, phase, window
 length, and content-analysis choice, shows the consent manifest before collecting and the entire
 payload before exporting, and writes nothing until you approve each. No agent required.
+
+Running it again reuses those answers, so a repeat collection is one keypress — or none, with
+`second-observer run --repeat`. Every run is a separate snapshot; nothing is overwritten. List
+them with `second-observer snapshots` and choose between them when you report.
 
 Every step is also available as a separate non-interactive command that infers nothing:
 
