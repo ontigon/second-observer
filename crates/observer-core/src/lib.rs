@@ -816,6 +816,7 @@ fn set_owner_only_directory(path: &Path) -> Result<(), std::io::Error> {
 }
 
 #[cfg(not(unix))]
+#[allow(clippy::unnecessary_wraps)]
 fn set_owner_only_directory(_path: &Path) -> Result<(), std::io::Error> {
     Ok(())
 }
